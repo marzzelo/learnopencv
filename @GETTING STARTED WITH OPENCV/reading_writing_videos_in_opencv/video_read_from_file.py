@@ -1,7 +1,7 @@
 import cv2
 
 # Create a video capture object, in this case we are reading the video from a file
-vid_capture = cv2.VideoCapture("Resources/cam1.mp4")
+vid_capture = cv2.VideoCapture("Resources/rain.mp4")
 
 if not vid_capture.isOpened():
     print("Error opening the video file")
@@ -17,6 +17,8 @@ else:
     # You can replace 7 with CAP_PROP_FRAME_COUNT as well, they are enumerations
     frame_count = vid_capture.get(7)
     print("Frame count : ", frame_count)
+    
+    print("Video duration : ", frame_count/fps, "seconds")
 
 
 #########################################
