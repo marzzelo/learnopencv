@@ -1,7 +1,14 @@
+import os
+
 import cv2
 
+# change directory to the folder where the image is stored
+os.chdir(
+    r"D:\Python\learnopencv\@GETTING STARTED WITH OPENCV\reading_writing_videos_in_opencv"
+)
+
 # Create a video capture object, in this case we are reading the video from a file
-vid_capture = cv2.VideoCapture("Resources/rain.mp4")
+vid_capture = cv2.VideoCapture("Resources/lluvia1.mp4")
 
 if not vid_capture.isOpened():
     print("Error opening the video file")
@@ -13,12 +20,14 @@ else:
     fps = vid_capture.get(cv2.CAP_PROP_FPS)
     print("Frames per second : ", fps, "FPS")
 
+    key = cv2.waitKey(1000)
+
     # Get frame count
     # You can replace 7 with CAP_PROP_FRAME_COUNT as well, they are enumerations
     frame_count = vid_capture.get(7)
     print("Frame count : ", frame_count)
-    
-    print("Video duration : ", frame_count/fps, "seconds")
+
+    print("Video duration : ", frame_count / fps, "seconds")
 
 
 #########################################
