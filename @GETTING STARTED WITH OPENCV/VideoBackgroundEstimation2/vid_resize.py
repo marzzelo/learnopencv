@@ -5,7 +5,7 @@ import os
 # change directory to the folder where the image is stored
 os.chdir("D:\Python\learnopencv\@GETTING STARTED WITH OPENCV\VideoBackgroundEstimation2")
 
-orig_file = "cam1.mp4"
+orig_file = "chorro_r.mp4"
 # Create a video capture object
 vid_capture = cv2.VideoCapture(orig_file)
 
@@ -23,7 +23,7 @@ nframes = vid_capture.get(cv2.CAP_PROP_FRAME_COUNT)
 print(f"frame count: {nframes}, fps: {fps}, new frame size: {frame_size}")
 
 # Create a video writer object
-out_file = orig_file.split('.')[0] + '_r.avi'
+out_file = orig_file.split('.')[0] + '_r.mp4'
 output = cv2.VideoWriter(out_file, cv2.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
 
 nf = 0
@@ -39,7 +39,8 @@ while(vid_capture.isOpened()):
     if ret is True:
         frame = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
         output.write(frame) # Write the frame to the output file
-        cv2.imshow("Frame",frame)
+        if nf % 100 == 0:
+            cv2.imshow("Frame",frame)
         # k == 113 is ASCII code for q key. You can try to replace that 
         # with any key with its corresponding ASCII code, try 27 which is for ESCAPE
         key = cv2.waitKey(1)

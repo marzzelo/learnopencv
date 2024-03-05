@@ -6,124 +6,223 @@ import winsound
 import cv2
 import numpy as np
 
-# change directory to the folder where the image is stored
-os.chdir(
-    "D:\Python\learnopencv\@GETTING STARTED WITH OPENCV\VideoBackgroundEstimation2"
-)
+
+class VideoBackgroundEstimation:
+    """
+    Class for estimating and removing the background from a video.
+
+    Args:
+        video_path (str): Path to the video file.
+
+    Attributes:
+        video_path (str): Path to the video file.
+        cap (cv2.VideoCapture): Video capture object.
+        median_frame (numpy.ndarray): Median frame of the video.
+        mask (numpy.ndarray): Mask for background removal.
+
+    Methods:
+        play_beep: Plays a beep sound.
+        compute_median_frame: Computes the median frame of the video.
+        create_mask: Creates a mask for background removal.
+        run_video: Runs the video and performs background removal.
+        process_video: Processes the video by estimating and removing the background.
+    """
+
+    def __init__(self, video_path):
+        self.video_path = video_path
+        self.cap = None
+        self.median_frame = None
+        self.mask = None
+
+    def play_beep(self):
+        """
+        Plays a beep sound.
+        """
+        winsound.Beep(1000, 200)
+
+    def compute_median_frame(self, n_frames=50):
+        """
+        Computes the median frame of the video.
+
+        Args:
+            start_frame (int): Starting frame index (default: 0).
+            n_frames (int): Number of frames to consider for computing the median frame (default: 150).
+
+        Returns:
+            numpy.ndarray: The computed median frame.
+        """
+        frames = []
+        frame_id = int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))
+
+        print(
+            f"Computing median frame... (start_frame: {frame_id}, n_frames: {n_frames})"
+        )
+        print("*" * n_frames)
+
+        for i in range(n_frames):
+
+            ret, frame = self.cap.read()
+            if not ret:
+                print("Can't receive frame (stream end?). Exiting ...")
+                gray_median_frame = cv2.imread("median_frame.png", cv2.IMREAD_GRAYSCALE)
+                return gray_median_frame
+
+            frames.append(frame)
+            # # skip 10 frames
+            # self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id + 10)
+            print("*", end="")
+
+        median_frame = np.median(frames, axis=0).astype(dtype=np.uint8)
+        self.median_frame = cv2.cvtColor(median_frame, cv2.COLOR_BGR2GRAY)
+
+        print("\nMedian frame computed successfully.")
 
 
-# Function to play beep sound asynchronously
-def play_beep():
-    winsound.Beep(1000, 200)
+    def create_mask(self, base_mask=None):
+        """
+        Creates a mask for background removal.
 
+        Args:
+            base_mask (numpy.ndarray): Base mask to start with (default: None).
 
-# Open Camera
-# cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-# Open Video
-cap = cv2.VideoCapture("cam1_r.avi", cv2.CAP_FFMPEG)
-print(f"cap: {cap}")
+        Returns:
+            numpy.ndarray: The created mask.
+        """
+        radius = 15
+        # med_frame = cv2.imread("median_frame.png")
+        med_frame = self.median_frame
 
-def compute_medianframe():
-    
-    frames = []
-    nframes = 50
+        if base_mask is not None:
+            mask = base_mask
+        else:
+            mask = np.ones(med_frame.shape[:2], dtype=np.uint8) * 255
 
-    # append n frames to the frames array
-    print("Capturing frames...")
-    print("." * nframes)
+        def paint_mask(action, x, y, flags, *userdata):
+            global pen
 
-    for i in range(nframes):
-        ret, frame = cap.read()
-        if not ret:
-            print("Can't receive frame (stream end?). Exiting ...")
-            break
+            if action == cv2.EVENT_LBUTTONDOWN:
+                pen = True
+            elif action == cv2.EVENT_LBUTTONUP:
+                pen = False
+            elif action == cv2.EVENT_MOUSEMOVE:
+                if pen:
+                    cv2.circle(mask, (x, y), radius, (0, 0, 0), -1)
+                    cv2.circle(med_frame, (x, y), radius, (0, 0, 0), -1)
 
-        frames.append(frame)
-        print(".", end="", flush=True)
+        cv2.namedWindow("image", cv2.WINDOW_NORMAL)
+        cv2.setMouseCallback("image", paint_mask)
 
-    # Calculate the median along the time axis
-    medianFrame = np.median(frames, axis=0).astype(dtype=np.uint8)
+        while True:
+            cv2.imshow("image", med_frame)
+            key = cv2.waitKey(5)
+            if key & 0xFF == 27:
+                break
 
-    # save the median frame
-    cv2.imwrite("median_frame.png", medianFrame)
+            if key == ord("+"):
+                radius += 5  # Increase the radius of the brush
 
-    return medianFrame
+            if key == ord("-"):
+                radius -= 5
+                if radius < 5:  # Decrease the radius of the brush
+                    radius = 5  # Minimum radius is 5
 
+        cv2.imwrite("mask.png", mask)
+        cv2.destroyAllWindows()
 
-def run_video(medianFrame, threshold=500):
-    # Reset frame number to 0
-    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        return mask
 
-    # Convert background to grayscale
-    grayMedianFrame = cv2.cvtColor(medianFrame, cv2.COLOR_BGR2GRAY)
+    def run_video(self, threshold=500, start_frame=0):
+        """
+        Runs the video and performs background removal.
 
-    # Loop over all frames
-    ret = True
+        Args:
+            threshold (int): Threshold for detecting foreground objects (default: 500).
+            start_frame (int): Starting frame index (default: 0).
+        """
+        self.cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+        cv2.namedWindow("frame", cv2.WINDOW_NORMAL)
 
-    _last_time = time.time()
-    nwarn = 0
+        ret = True
+        _last_time = time.time()
+        n_warn = 0
 
-    while ret:
-        # Read frame
-        ret, frame = cap.read()
+        while ret:
+            ret, frame = self.cap.read()
+            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            d_frame = cv2.absdiff(gray_frame, self.median_frame)
+            th, td_frame = cv2.threshold(d_frame, 40, 255, cv2.THRESH_BINARY)
+            td_frame = cv2.bitwise_and(td_frame, self.mask)
+            count = cv2.countNonZero(td_frame)
+            frame_id = int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))
 
-        # Convert current frame to grayscale
-        bwframe = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            cv2.putText(
+                frame,
+                f"Frame: {frame_id}, count: {count}",
+                (10, 50),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                (0, 255, 0),
+                2,
+                cv2.LINE_AA,
+            )
 
-        # Calculate absolute difference of current frame and
-        # the median frame
-        dframe = cv2.absdiff(bwframe, grayMedianFrame)
+            if count > threshold and count < 100000:
+                contours, _ = cv2.findContours(
+                    td_frame, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
+                )
+                cv2.drawContours(frame, contours, -1, (0, 255, 0), 2)
 
-        # Treshold to binarize
-        th, dframe = cv2.threshold(dframe, 50, 255, cv2.THRESH_BINARY)
+                current_time = time.time()
+                if current_time - _last_time >= 1:
+                    _last_time = current_time
+                    cv2.imwrite(f"warning_{n_warn}.png", frame)
+                    n_warn += 1
+                    threading.Thread(target=self.play_beep).start()
 
-        # count the pixels that are not black
-        count = cv2.countNonZero(dframe)
+            cv2.imshow("frame", frame)
 
-        # if more than 10 pixels are not black.
-        if count > threshold:
-            # detect and draw contour around the non-black pixels
-            contours, _ = cv2.findContours(dframe, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-            cv2.drawContours(frame, contours, -1, (0, 255, 0), 3)      
+            if frame_id % 500 == 0:
+                self.compute_median_frame(50)
+                # self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
 
-            current_time = time.time()
-            if current_time - _last_time >= 10:
-                print(f"delta time: {current_time - _last_time}")
-                _last_time = current_time
-                
-                # write the frame to disk
-                cv2.imwrite(f"warning_{nwarn}.png", frame)
-                nwarn += 1
+            key = cv2.waitKey(1)
+            if key == ord("q") or key == 27:
+                break
 
-                threading.Thread(target=play_beep).start()
-                
+            if key == ord("p"):
+                cv2.waitKey(0)
 
-        # multiply dframe with frame using and operator
-        # fframe = cv2.bitwise_or(frame, frame, mask=dframe)
+            if key == ord("f"):
+                self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id + 10000)
 
-        # Display image
-        cv2.imshow("frame", frame)
+            if key == ord("b"):
+                self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id - 1000)
 
-        key = cv2.waitKey(10)
-        if key == ord("q") or key == 27:
-            break
+            if key == ord("r"):
+                self.compute_median_frame(50)
+                # self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
+
+    def process_video(self):
+        """
+        Processes the video by estimating and removing the background.
+        """
+        self.cap = cv2.VideoCapture(self.video_path)
+
+        self.compute_median_frame(50)
+        self.mask = self.create_mask()
+
+        self.run_video(threshold=500, start_frame=0)
+
+        self.cap.release()
+        cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
-    
-    if os.path.exists("median_frame.png"):
-        medianframe = cv2.imread("median_frame.png")
-    else:
-        medianframe = compute_medianframe()
+    pen = False
 
-    run_video(medianframe, threshold=2000)
+    # Change dir to current file location
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-    # if exists, remove the median frame
-    # if os.path.exists("median_frame.png"):
-    #     os.remove("median_frame.png")
-
-    # Release video object
-    cap.release()
-
-    # Destroy all windows
-    cv2.destroyAllWindows()
+    video_path = "chorro.mp4"
+    video_processor = VideoBackgroundEstimation(video_path)
+    video_processor.process_video()
