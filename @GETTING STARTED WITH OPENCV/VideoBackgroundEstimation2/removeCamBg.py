@@ -142,12 +142,15 @@ class VideoBackgroundEstimation:
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
         cv2.namedWindow("frame", cv2.WINDOW_NORMAL)
 
-        ret = True
         _last_time = time.time()
         n_warn = 0
 
-        while ret:
+        while True:
             ret, frame = self.cap.read()
+            if not ret:
+                print("Can't receive frame (stream end?). Exiting ...")
+                break
+
             gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             d_frame = cv2.absdiff(gray_frame, self.median_frame)
             th, td_frame = cv2.threshold(d_frame, 40, 255, cv2.THRESH_BINARY)
