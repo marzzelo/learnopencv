@@ -40,7 +40,7 @@ class VideoBackgroundEstimation:
         """
         winsound.Beep(1000, 200)
 
-    def compute_median_frame(self, n_frames=50):
+    def compute_median_frame(self, frame_id, n_frames=10):
         """
         Computes the median frame of the video.
 
@@ -52,7 +52,7 @@ class VideoBackgroundEstimation:
             numpy.ndarray: The computed median frame.
         """
         frames = []
-        frame_id = int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))
+        # frame_id = int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))
 
         print(
             f"Computing median frame... (start_frame: {frame_id}, n_frames: {n_frames})"
@@ -77,7 +77,6 @@ class VideoBackgroundEstimation:
 
         print("\nMedian frame computed successfully.")
 
-
     def create_mask(self, base_mask=None):
         """
         Creates a mask for background removal.
@@ -88,20 +87,32 @@ class VideoBackgroundEstimation:
         Returns:
             numpy.ndarray: The created mask.
         """
-        radius = 15
+        radius = 40
         # med_frame = cv2.imread("median_frame.png")
-        med_frame = self.median_frame
+        med_frame = self.median_frame.copy()
+        h, w = med_frame.shape[:2]
+        print(f"Creating mask... (h: {h}, w: {w})")
 
         if base_mask is not None:
             mask = base_mask
         else:
             mask = np.ones(med_frame.shape[:2], dtype=np.uint8) * 255
+            # mask the lower left corner
+            cv2.rectangle(mask, (31, 1233), (820, 1394), (0, 0, 0), -1)
+            cv2.rectangle(
+                med_frame,
+                (31, 1233),
+                (820, 1394),
+                (0, 0, 0),
+                3,
+            )
 
         def paint_mask(action, x, y, flags, *userdata):
             global pen
 
             if action == cv2.EVENT_LBUTTONDOWN:
                 pen = True
+                print(f"Pen down at ({x}, {y})")
             elif action == cv2.EVENT_LBUTTONUP:
                 pen = False
             elif action == cv2.EVENT_MOUSEMOVE:
@@ -126,6 +137,10 @@ class VideoBackgroundEstimation:
                 if radius < 5:  # Decrease the radius of the brush
                     radius = 5  # Minimum radius is 5
 
+        self.mask_contours, _ = cv2.findContours(
+            mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
+        )
+
         cv2.imwrite("mask.png", mask)
         cv2.destroyAllWindows()
 
@@ -142,8 +157,13 @@ class VideoBackgroundEstimation:
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
         cv2.namedWindow("frame", cv2.WINDOW_NORMAL)
 
+        # add a trackbar to the window
+        cv2.createTrackbar("TrackBar", "frame", 0, self.length, lambda x: None)
+
         _last_time = time.time()
         n_warn = 0
+
+        h, w = self.median_frame.shape[:2]
 
         while True:
             ret, frame = self.cap.read()
@@ -157,17 +177,21 @@ class VideoBackgroundEstimation:
             td_frame = cv2.bitwise_and(td_frame, self.mask)
             count = cv2.countNonZero(td_frame)
             frame_id = int(self.cap.get(cv2.CAP_PROP_POS_FRAMES))
+            # update Trackbar position
+            cv2.setTrackbarPos("TrackBar", "frame", frame_id)
 
             cv2.putText(
                 frame,
                 f"Frame: {frame_id}, count: {count}",
-                (10, 50),
+                (w // 2 - 100, h - 10),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 1,
                 (0, 255, 0),
                 2,
                 cv2.LINE_AA,
             )
+
+            cv2.drawContours(frame, self.mask_contours, -1, (0, 0, 255), 2)
 
             if count > threshold and count < 100000:
                 contours, _ = cv2.findContours(
@@ -185,7 +209,7 @@ class VideoBackgroundEstimation:
             cv2.imshow("frame", frame)
 
             if frame_id % 500 == 0:
-                self.compute_median_frame(50)
+                self.compute_median_frame(frame_id)
                 # self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
 
             key = cv2.waitKey(1)
@@ -197,12 +221,14 @@ class VideoBackgroundEstimation:
 
             if key == ord("f"):
                 self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id + 10000)
+                self.compute_median_frame(frame_id + 10000)
 
             if key == ord("b"):
                 self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id - 1000)
+                self.compute_median_frame(frame_id - 1000)
 
             if key == ord("r"):
-                self.compute_median_frame(50)
+                self.compute_median_frame(frame_id)
                 # self.cap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
 
     def process_video(self):
@@ -210,8 +236,10 @@ class VideoBackgroundEstimation:
         Processes the video by estimating and removing the background.
         """
         self.cap = cv2.VideoCapture(self.video_path)
+        # save the length of the video
+        self.length = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-        self.compute_median_frame(50)
+        self.compute_median_frame(0)
         self.mask = self.create_mask()
 
         self.run_video(threshold=500, start_frame=0)

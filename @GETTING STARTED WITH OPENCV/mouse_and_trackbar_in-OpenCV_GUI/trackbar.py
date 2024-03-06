@@ -8,7 +8,7 @@ os.chdir("D:\Python\learnopencv\@GETTING STARTED WITH OPENCV\mouse_and_trackbar_
 maxScaleUp = 100
 scaleFactor = 1
 windowName = "Resize Image"
-trackbarValue = "Scale"
+trackbarName = "Scale"
 
 # load an image
 image = cv2.imread("Input/sample.jpg")
@@ -25,7 +25,7 @@ def scaleImage(*args):
     cv2.imshow(windowName, scaledImage)
 
 # Create trackbar
-cv2.createTrackbar(trackbarValue, windowName, scaleFactor, maxScaleUp, scaleImage)
+cv2.createTrackbar(trackbarName, windowName, scaleFactor, maxScaleUp, scaleImage)
 
 # Display the image
 cv2.imshow(windowName, image)
