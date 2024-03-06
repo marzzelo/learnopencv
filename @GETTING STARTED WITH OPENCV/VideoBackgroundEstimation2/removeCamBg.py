@@ -254,6 +254,6 @@ if __name__ == "__main__":
     # Change dir to current file location
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-    video_path = "chorro.mp4"
+    video_path = "flex2.mp4"
     video_processor = VideoBackgroundEstimation(video_path)
     video_processor.process_video()
