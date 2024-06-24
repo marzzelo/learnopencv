@@ -6,11 +6,13 @@ import numpy as np
 
 savevideo = True
 
-os.chdir(
-    r"D:\Python\learnopencv\@GETTING STARTED WITH OPENCV\reading_writing_videos_in_opencv"
-)
+file_directory = os.path.dirname(__file__)
 
-vid_path = "Resources/lluvia1.mp4"
+os.chdir(file_directory)
+
+vid_path = os.path.join(file_directory, "resources", "lluvia1.mp4")
+# "Resources/lluvia1.mp4"
+print(f"vid_path: {vid_path}")
 
 # Create a video capture object
 vid_capture = cv2.VideoCapture(vid_path)
